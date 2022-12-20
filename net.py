@@ -18,6 +18,7 @@ class PacketType(enum.Enum):
     DISCONNECT = 11
     KEEP_ALIVE = 12
     USERNAME = 13
+    ...
 
 
 class OutboundPacket:
