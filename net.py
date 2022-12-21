@@ -61,7 +61,8 @@ class InboundPacket:
 
     def receive(self):
         """Receive data, decode it, and return it.
-            Returns None if an error occurred."""
+            Returns None if an the client sent no data.
+            Returns False if an error occurred."""
         for i in range(50):
             try:
                 self.header = self.conn.recv(8)
@@ -75,9 +76,13 @@ class InboundPacket:
 
                 return self.data
             except BrokenPipeError:
-                return None
+                return False
             except ValueError:
                 time.sleep(0.1)
                 continue
         
         return None
+
+
+# so `from net import *` imports all the packet types
+globals().update(PacketType.__members__)
