@@ -10,7 +10,7 @@ and the last 2 bytes defines the kind of packet.
 
 import enum
 import socket
-import time
+import threading
 
 
 class PacketType(enum.Enum):
@@ -21,12 +21,12 @@ class PacketType(enum.Enum):
     ...
 
 
-class OutboundPacket:
+class Packet:
     """A class that makes creating/sending packets easier"""
 
-    def __init__(self, packet_type: PacketType, data: str, conn: socket.socket):
+    def __init__(self, type: PacketType, data: str, conn: socket.socket):
         self.data = data
-        self.packet_type = packet_type
+        self.type = type
         self.conn = conn
         
         self.prep()
@@ -45,43 +45,77 @@ class OutboundPacket:
 
             # generate header
             self._size = str(self.size).zfill(6)
-            self._packet_type: int = self.packet_type.value
-            self.header = str(self._size + str(self._packet_type)).encode('utf-8')
+            self._type: int = self.type.value
+            self.header = str(self._size + str(self._type)).encode('utf-8')
 
     def send(self):
         self.conn.send(self.header)
         self.conn.send(self._data)
 
+    def __repr__(self):
+        return f"Packet({self.type}, {self.data})"
 
-class InboundPacket:
-    """A class that makes decoding received packets easier"""
 
-    def __init__(self, conn: socket.socket):
-        self.conn = conn
+def receive_data(conn):
+    """Receive data, decode it, and return it as a Packet.
+        Returns None if an the client sent no data.
+        Returns False if an error occurred."""
+    try:
+        header = conn.recv(8)
+        size = int(header[:6])
 
-    def receive(self):
-        """Receive data, decode it, and return it.
-            Returns None if an the client sent no data.
-            Returns False if an error occurred."""
-        for i in range(50):
-            try:
-                self.header = self.conn.recv(8)
-                self.size = int(self.header[:6])
+        _type = int(header[6:])
+        type = PacketType(_type)
 
-                self._packet_type = int(self.header[6:])
-                self.packet_type = PacketType(self._packet_type)
+        _data = conn.recv(size)
+        data = _data.decode('utf-8')
 
-                self._data = self.conn.recv(self.size)
-                self.data = self._data.decode('utf-8')
-
-                return self.data
-            except BrokenPipeError:
-                return False
-            except ValueError:
-                time.sleep(0.1)
-                continue
-        
+        return Packet(type, data, conn)
+    except (BrokenPipeError, ConnectionError):
+        return False
+    except (ValueError, TimeoutError):
         return None
+
+
+class PacketQueue(threading.Thread):
+    def __init__(self, client):
+        super().__init__()
+
+        self.client = client
+
+        self.queue = []
+    
+    def run(self):
+        while self.client.game.running:
+            packet = receive_data(self.client.conn)
+
+            if packet is False:
+                self.client.disconnect('Lost connection')
+                sys.exit()
+            elif packet is None:
+                continue
+            else:
+                self.queue.append(packet)
+
+    def find(self, packet_types: PacketType=[], data=[], remove=True):
+        """Find a packet by packet_type, data, or both."""
+        if not packet_types and not data:
+            found_packets = []
+        elif packet_types and not data:
+            found_packets = [p for p in self.queue if p.type in packet_types]
+        elif data and not packet_types:
+            found_packets = [p for p in self.queue if p.data in data]
+        else: # data and packet_type
+            found_packets = [
+                p for p in self.queue 
+                if p.data in data and p.type in packet_types
+                ]
+        
+        if remove:
+            for packet in found_packets:
+                self.queue.remove(packet)
+
+        return found_packets
 
 
 # so `from net import *` imports all the packet types
