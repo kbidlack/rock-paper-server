@@ -25,15 +25,20 @@ class Game():
         self.clients = []
         self.shutdown_key = str(uuid.uuid4())
 
+        self.console = Console(game=self)
+
     def start(self):
         main_thread = threading.Thread(target=self.main)
         client_thread = threading.Thread(target=self.handle_clients)
     
         main_thread.start()
         client_thread.start()
+
+        print("done!")
+        self.console.start()
     
-    def shutdown():
-        print("Game is shutting down...")
+    def shutdown(self):
+        print("Game is shutting down...", end=" ")
         shutdown_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         shutdown_client.connect(self.ADDR)
 
@@ -48,6 +53,7 @@ class Game():
         ...
     
     def handle_clients(self):
+        """Handles new client connections"""
         self.server.listen()
         while self.running:
             conn, addr = self.server.accept()
@@ -100,6 +106,23 @@ class Client:
         ...
 
 
+class Console(threading.Thread):
+    def __init__(self, game: Game):
+        super().__init__()
+
+        self.game = game
+
+    def run(self):
+        while self.game.running:
+            command = input("> ")
+            if not command:
+                continue
+            elif command in ["exit", "quit", "stop"]:
+                self.game.shutdown()
+            else:
+                print("Unknown command!")
+
+
 def main():
     print("Server is starting...", end=" ")
 
@@ -112,8 +135,6 @@ def main():
 
     game = Game(server, ADDR)
     game.start()
-
-    print("done!")
 
 
 if __name__ == "__main__":
