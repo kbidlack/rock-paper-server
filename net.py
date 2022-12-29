@@ -26,10 +26,32 @@ class Packet:
 
     def __init__(self, type: PacketType, data: str, conn: socket.socket):
         self.data = data
+        
         self.type = type
         self.conn = conn
         
         self.prep()
+    
+    @classmethod
+    def from_incoming(cls, conn: socket.socket):
+        """Create a new Packet object from incoming data.
+        Returns None if the connection sent no data.
+        Returns False if an error occurred."""
+        try:
+                header = conn.recv(8)
+                size = int(header[:6])
+
+                _type = int(header[6:])
+                type = PacketType(_type)
+
+                _data = conn.recv(size)
+                data = _data.decode('utf-8')
+
+                return cls(type, data, conn)
+        except (BrokenPipeError, ConnectionError):
+            return False
+        except (ValueError, TimeoutError):
+            return None
     
     def prep(self) -> None:
         """Generates the packet header and encodes the data."""
@@ -56,27 +78,6 @@ class Packet:
         return f"Packet({self.type}, {self.data})"
 
 
-def receive_data(conn):
-    """Receive data, decode it, and return it as a Packet.
-        Returns None if an the client sent no data.
-        Returns False if an error occurred."""
-    try:
-        header = conn.recv(8)
-        size = int(header[:6])
-
-        _type = int(header[6:])
-        type = PacketType(_type)
-
-        _data = conn.recv(size)
-        data = _data.decode('utf-8')
-
-        return Packet(type, data, conn)
-    except (BrokenPipeError, ConnectionError):
-        return False
-    except (ValueError, TimeoutError):
-        return None
-
-
 class PacketQueue(threading.Thread):
     def __init__(self, client):
         super().__init__()
@@ -87,7 +88,7 @@ class PacketQueue(threading.Thread):
     
     def run(self):
         while self.client.game.running:
-            packet = receive_data(self.client.conn)
+            packet = Packet.from_incoming(self.client.conn)
 
             if packet is False:
                 self.client.disconnect('Lost connection')

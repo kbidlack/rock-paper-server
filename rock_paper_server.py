@@ -58,7 +58,7 @@ class Game():
         while self.running:
             conn, addr = self.server.accept()
             if self.waiting_for_clients:
-                username = receive_data(conn).data
+                username = Packet.from_incoming(conn).data
                 username_chars = [c for c in username]
 
                 if username == self.shutdown_key:
