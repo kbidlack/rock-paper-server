@@ -8,12 +8,12 @@ The header is 8 bytes. The first 6 bytes define the size of the packet,
 and the last 2 bytes defines the kind of packet.
 """
 
-import enum
 import socket
 import threading
+from enum import IntEnum
 
 
-class PacketType(enum.Enum):
+class PacketType(IntEnum):
     CONNECT = 10
     DISCONNECT = 11
     KEEP_ALIVE = 12
