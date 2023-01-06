@@ -18,13 +18,14 @@ class PacketType(IntEnum):
     DISCONNECT = 11
     KEEP_ALIVE = 12
     USERNAME = 13
+    GAME_START = 14
     ...
 
 
 class Packet:
     """A class that makes creating/sending packets easier"""
 
-    def __init__(self, type: PacketType, data: str, conn: socket.socket):
+    def __init__(self, type: PacketType, data: str, conn: socket.socket = None):
         self.data = data
         
         self.type = type
@@ -98,7 +99,9 @@ class PacketQueue(threading.Thread):
             else:
                 self.queue.append(packet)
 
-    def find(self, packet_types: PacketType=[], data=[], remove=True):
+        sys.exit() # exit when game ends
+
+    def find(self, packet_types: PacketType = [], data=[], remove=True):
         """Find a packet by packet_type, data, or both."""
         if not packet_types and not data:
             found_packets = []
