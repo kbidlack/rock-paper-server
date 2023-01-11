@@ -80,44 +80,60 @@ class Packet:
 
 
 class PacketQueue(threading.Thread):
-    def __init__(self, client):
+    def __init__(self, conn):
         super().__init__()
 
-        self.client = client
+        self.conn = conn
 
-        self.queue = []
+        self._queue = []
+        self.shutting_down = False
+
+
+    def __iter__(self):
+        self._index = 0
+        return self
     
-    def run(self):
-        while self.client.game.running:
-            packet = Packet.from_incoming(self.client.conn)
+    def __next__(self):
+        if self._index <= len(self._queue) - 1:
+            return self._queue[self._index]
+        else:
+            raise StopIteration
 
-            if packet is False:
-                self.client.disconnect('Lost connection')
-                sys.exit()
-            elif packet is None:
+    def __bool__(self):
+        return bool(self._queue)
+
+
+    def run(self):
+        while not self.shutting_down:
+            packet = Packet.from_incoming(self.conn)
+
+            if packet is None:
                 continue
             else:
-                self.queue.append(packet)
+                self._queue.append(packet)
 
         sys.exit() # exit when game ends
+    
+    def stop(self):
+        self.shutting_down = True
 
-    def find(self, packet_types: PacketType = [], data=[], remove=True):
+    def find(self, packet_types: list[PacketType, ...] = [], data: list[str, ...] = [], remove=True):
         """Find a packet by packet_type, data, or both."""
         if not packet_types and not data:
             found_packets = []
         elif packet_types and not data:
-            found_packets = [p for p in self.queue if p.type in packet_types]
+            found_packets = [p for p in self._queue if p.type in packet_types]
         elif data and not packet_types:
-            found_packets = [p for p in self.queue if p.data in data]
+            found_packets = [p for p in self._queue if p.data in data]
         else: # data and packet_type
             found_packets = [
-                p for p in self.queue 
+                p for p in self._queue 
                 if p.data in data and p.type in packet_types
                 ]
         
         if remove:
             for packet in found_packets:
-                self.queue.remove(packet)
+                self._queue.remove(packet)
 
         return found_packets
 
